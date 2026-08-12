@@ -1,0 +1,82 @@
+# Runnable demo stack: ClamAV + Redis + a Celery worker running the scan task.
+#
+#   docker compose up --build
+#   docker compose run --rm demo python examples/demo.py
+#
+# First start is slow: the ClamAV image downloads its signature database
+# (~200 MB) before it reports healthy. The healthcheck below gates the worker on
+# that, so nothing scans against an empty signature set.
+
+services:
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    healthcheck:
+      # `clamdscan --ping` succeeds only once the daemon has loaded signatures.
+      test: ["CMD-SHELL", "clamdscan --ping 1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
+    volumes:
+      - clamav_db:/var/lib/clamav
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["celery", "-A", "examples.worker", "worker", "-Q", "virus_scan", "-l", "info"]
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      STORAGE_BACKEND: local
+      UPLOAD_FOLDER: /data/live
+      QUARANTINE_FOLDER: /data/quarantine
+    depends_on:
+      clamav:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - demo_data:/data
+
+  # One-shot container for driving the demo by hand.
+  demo:
+    build: .
+    profiles: ["tools"]
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      STORAGE_BACKEND: local
+      UPLOAD_FOLDER: /data/live
+      QUARANTINE_FOLDER: /data/quarantine
+    depends_on:
+      clamav:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - demo_data:/data
+    command: ["python", "examples/demo.py"]
+
+volumes:
+  clamav_db:
+  redis_data:
+  demo_data:

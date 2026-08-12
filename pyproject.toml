@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quarantine-scan"
+version = "0.1.0"
+description = "Quarantine → antivirus scan → promote pipeline for user uploads, with optional Celery wiring."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Oluwafemi Akinlosotu" }]
+keywords = ["antivirus", "clamav", "celery", "uploads", "s3", "quarantine"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: System :: Archiving",
+]
+dependencies = []
+
+[project.optional-dependencies]
+clamav = ["clamd>=1.0.2"]
+s3 = ["boto3>=1.28"]
+celery = ["celery>=5.3"]
+dev = ["pytest>=8.0", "clamd>=1.0.2", "boto3>=1.28", "celery>=5.3"]
+
+[project.urls]
+Homepage = "https://github.com/FemiFX/celery-quarantine-scan-promote"
+Issues = "https://github.com/FemiFX/celery-quarantine-scan-promote/issues"
+
+[tool.setuptools.packages.find]
+include = ["quarantine_scan*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
